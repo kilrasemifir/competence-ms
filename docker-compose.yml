@@ -1,0 +1,85 @@
+version: "3.7"
+
+services:
+  consul:
+    image: consul:1.4.2
+    ports:
+    - 8500:8500
+  
+  traefik:
+    image: "traefik:v2.5"
+    container_name: "traefik"
+    command:
+      - "--log.level=DEBUG"
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--providers.consulcatalog.endpoint.address=consul:8500"
+      - --providers.consulcatalog.defaultRule=PathPrefix(`/api/{{ .Name }}`)
+      - --serversTransport.insecureSkipVerify=true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "80:80"
+      - "8080:8080"
+  mongo:
+    image: mongo
+    ports:
+    - 27017:27017
+  
+  mongo-ui:
+    image: mongo-express
+    ports:
+    - 8081:8081
+    depends_on:
+      - mongo
+  
+  competences:
+    build: competences/.
+    environment:
+    - MONGO_HOST=mongo
+    - DB_NAME=competences
+    - CONSUL_HOST=consul
+    depends_on:
+      - consul
+      - mongo
+    # labels:
+    #   - traefik.enable=true
+    #   - traefik.http.routers.competences.rule=PathPrefix(`/competences`)
+    #   - traefik.http.routers.competences.entrypoints=web
+  
+  equipes:
+    build: equipes/.
+    environment:
+    - MONGO_HOST=mongo
+    - DB_NAME=equipes
+    - COMPETENCES_HOST=competences
+    - COMPETENCES_PORT=80
+    - CONSUL_HOST=consul
+    depends_on:
+      - consul
+      - mongo
+
+  utilisateurs:
+    build: utilisateurs/.
+    environment:
+    - MONGO_HOST=mongo
+    - DB_NAME=equipes
+    - CONSUL_HOST=consul
+    depends_on:
+      - consul
+      - mongo
+  
+  personne-competences:
+    build: personne-competences/.
+    environment:
+    - PROJECT_NAME=personne-competences
+    - MONGO_HOST=mongo
+    - DB_NAME=equipes
+    - CONSUL_HOST=consul
+    depends_on:
+      - consul
+      - mongo
+  
+  
